@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        /* DESIGN TOKENS */
+        :root {
+            --bg-color: #f0f0f0;
+            --grid-color: #d1d1d1;
+            --accent-orange: #ff4500;
+            --text-main: #1a1a1a;
+            --font-serif: 'Playfair Display', Georgia, serif;
+            --font-sans: 'Inter', Helvetica, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            font-family: var(--font-serif);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            min-height: 150vh; /* Ensures scrollable landing page */
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--text-main);
+        }
+
+        .logo { cursor: pointer; font-family: var(--font-sans); }
+        nav a { margin-left: 20px; text-decoration: none; color: var(--text-main); font-family: var(--font-sans); }
+
+        .cta-button {
+            background-color: var(--accent-orange);
+            color: white;
+            font-family: var(--font-sans);
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 1rem 2rem;
+            border: none;
+            cursor: pointer;
+        }
+
+        footer {
+            margin-top: 5rem;
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--text-main);
+            padding-top: 1rem;
+        }
+
+        /* WORKSPACE */
+        #workspace { display: none; }
+        .room-box {
+            position: absolute;
+            border: 2px solid var(--text-main);
+            background-color: white;
+            padding: 10px;
+            cursor: move;
+            display: flex;
+            flex-direction: column;
+            resize: both;
+            overflow: auto;
+            min-width: 50px;
+            min-height: 50px;
+        }
+        .canvas-area { height: 80vh; position: relative; border: 1px dashed var(--text-main); margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 class="logo" onclick="showPage('landing')">RESEARCH DESK</h1>
+        <nav>
+            <a href="#" onclick="showPage('inventory')">Inventory</a>
+            <a href="#" onclick="showPage('comparison')">Comparison</a>
+        </nav>
+    </header>
+
+    <main id="landing">
+        <h2>PROJECT ARCHIVE</h2>
+        <p>Rationalist digital infrastructure for curated research.</p>
+        <button class="cta-button" onclick="showPage('workspace')">Start Project</button>
+    </main>
+
+    <main id="workspace">
+        <div class="controls">
+            <input type="text" id="roomName" placeholder="Room Name">
+            <input type="number" id="sqm" placeholder="Area (sqm)">
+            <button class="cta-button" onclick="addRoom()">Add Box</button>
+        </div>
+        <div id="canvas" class="canvas-area"></div>
+    </main>
+
+    <main id="inventory" style="display:none;"><h2>Inventory</h2><p>Blank.</p></main>
+    <main id="comparison" style="display:none;"><h2>Comparison</h2><p>Blank.</p></main>
+
+    <footer>
+        <p>&copy; 2026 Research Desk. All rights reserved.</p>
+        <p>Contact: archives@researchdesk.example</p>
+    </footer>
+
+    <script>
+        function showPage(id) {
+            document.getElementById('landing').style.display = (id === 'landing') ? 'block' : 'none';
+            document.getElementById('workspace').style.display = (id === 'workspace') ? 'block' : 'none';
+            document.getElementById('inventory').style.display = (id === 'inventory') ? 'block' : 'none';
+            document.getElementById('comparison').style.display = (id === 'comparison') ? 'block' : 'none';
+        }
+
+        function addRoom() {
+            const name = document.getElementById('roomName').value || 'Room';
+            const size = parseFloat(document.getElementById('sqm').value) || 20;
+            const side = Math.sqrt(size) * 10; // Scaled for interface
+
+            const box = document.createElement('div');
+            box.className = 'room-box';
+            box.style.width = side + 'px';
+            box.style.height = side + 'px';
+            box.style.left = '50px';
+            box.style.top = '100px';
+            box.innerHTML = `<span>${name}</span><input type="color" onchange="this.parentElement.style.backgroundColor = this.value">`;
+
+            box.onmousedown = function(e) {
+                let shiftX = e.clientX - box.getBoundingClientRect().left;
+                let shiftY = e.clientY - box.getBoundingClientRect().top;
+                function moveAt(pageX, pageY) {
+                    box.style.left = pageX - shiftX + 'px';
+                    box.style.top = pageY - shiftY + 'px';
+                }
+                function onMouseMove(e) { moveAt(e.pageX, e.pageY); }
+                document.addEventListener('mousemove', onMouseMove);
+                box.onmouseup = function() { document.removeEventListener('mousemove', onMouseMove); };
+            };
+            document.getElementById('canvas').appendChild(box);
+        }
+    </script>
+</body>
+</html>
