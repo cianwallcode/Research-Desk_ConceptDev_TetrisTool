@@ -14,7 +14,6 @@
         .workspace-grid { display: grid; grid-template-columns: 300px 1fr 1fr; gap: 20px; height: 70vh; }
         .controls { background: white; padding: 20px; border: 1px solid #ccc; overflow-y: auto; }
         
-        /* 2D Canvas with Grid */
         .view-port { position: relative; border: 1px solid #ccc; background: #fafafa; overflow: hidden; }
         #canvas-2d { 
             background-image: linear-gradient(to right, #e0e0e0 1px, transparent 1px), linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
@@ -46,10 +45,12 @@
             <div id="legend"></div>
 
             <h3 style="margin-top:20px;">Program</h3>
-            <select id="rName" style="width: 100%; margin-bottom: 10px;">
+            <select id="rName" onchange="toggleCustom()" style="width: 100%; margin-bottom: 10px;">
                 <option value="Living">Living</option><option value="Kitchen">Kitchen</option>
-                <option value="Circulation">Circulation</option><option value="Exterior">Exterior</option>
+                <option value="Bathroom">Bathroom</option><option value="Circulation">Circulation</option>
+                <option value="Custom">Custom Room</option>
             </select>
+            <input type="text" id="customName" placeholder="Enter room name" style="display:none; width:95%; margin-bottom:10px;">
             <select id="rSqm" style="width: 100%; margin-bottom: 10px;">
                 <option value="10">10sqm</option><option value="50">50sqm</option><option value="100">100sqm</option>
             </select>
@@ -82,8 +83,12 @@
         let selectedId = null;
         let scene, camera, renderer;
         const scale = 15;
-        const SNAP_DIST = 20;
-        const colorMap = { "Living": 0xFFCC00, "Kitchen": 0xFFCC00, "Circulation": 0xFF4500, "Exterior": 0x77DD77 };
+        const GRID_SIZE = 20;
+        const colorMap = { "Living": 0xFFCC00, "Kitchen": 0xFFCC00, "Bathroom": 0xD4E5FF, "Circulation": 0xFF4500, "Exterior": 0x77DD77, "Custom": 0xCCCCCC };
+
+        function toggleCustom() {
+            document.getElementById('customName').style.display = (document.getElementById('rName').value === 'Custom') ? 'block' : 'none';
+        }
 
         const legendDiv = document.getElementById('legend');
         Object.entries(colorMap).forEach(([name, color]) => {
@@ -119,11 +124,15 @@
         }
 
         function addRoom() {
-            const name = document.getElementById('rName').value;
+            let name = document.getElementById('rName').value;
+            if(name === 'Custom') name = document.getElementById('customName').value || 'New Room';
             const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value)) * scale;
             const id = 'room-' + Date.now();
-            let w = (name === 'Circulation') ? size * 1.5 : size;
-            let h = (name === 'Circulation') ? size * 0.75 : size;
+            
+            // Circulation: 1.2m wide, 5m long. Others: based on input size.
+            let w = (name === 'Circulation') ? 1.2 * scale : size;
+            let h = (name === 'Circulation') ? 5 * scale : size;
+            
             const offset = rooms.length * 25;
             
             const box = document.createElement('div');
@@ -131,7 +140,7 @@
             box.style.width = w + 'px'; box.style.height = h + 'px';
             box.style.left = (50 + offset) + 'px'; 
             box.style.top = (50 + offset) + 'px';
-            box.style.backgroundColor = '#' + colorMap[name].toString(16).padStart(6, '0');
+            box.style.backgroundColor = '#' + (colorMap[name] || 0xCCCCCC).toString(16).padStart(6, '0');
             box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
             
             box.onclick = () => selectRoom(id);
@@ -139,9 +148,9 @@
             
             new ResizeObserver(() => {
                 const b = document.getElementById(id);
-                const w = (b.offsetWidth/scale).toFixed(0);
-                const h = (b.offsetHeight/scale).toFixed(0);
-                b.querySelector('.dims').innerText = `${w}m x ${h}m | ${w*h}sqm`;
+                const w = (b.offsetWidth/scale).toFixed(1);
+                const h = (b.offsetHeight/scale).toFixed(1);
+                b.querySelector('.dims').innerText = `${w}m x ${h}m | ${(w*h).toFixed(1)}sqm`;
                 renderLines(); render3D();
             }).observe(box);
 
@@ -219,13 +228,8 @@
                 let left = e.clientX - shiftX - document.getElementById('canvas-2d').getBoundingClientRect().left;
                 let top = e.clientY - shiftY - document.getElementById('canvas-2d').getBoundingClientRect().top;
 
-                // Snapping Logic
-                rooms.forEach(r => {
-                    if (r.id === el.id) return;
-                    let target = document.getElementById(r.id);
-                    if (Math.abs(left - (target.offsetLeft + target.offsetWidth)) < SNAP_DIST) left = target.offsetLeft + target.offsetWidth;
-                    if (Math.abs(top - (target.offsetTop + target.offsetHeight)) < SNAP_DIST) top = target.offsetTop + target.offsetHeight;
-                });
+                left = Math.round(left / GRID_SIZE) * GRID_SIZE;
+                top = Math.round(top / GRID_SIZE) * GRID_SIZE;
 
                 el.style.left = left + 'px';
                 el.style.top = top + 'px';
