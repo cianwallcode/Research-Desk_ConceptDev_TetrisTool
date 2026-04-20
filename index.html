@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>RESEARCH DESK</title>
-    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB4PSIwIiB5PSIyNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZmY0NTAwIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZjQ1MDAiLz48cmVjdCB4PSI1MCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjxyZWN0IHg9IjEwMCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjwvc3ZnPg==">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgMTI1Ij48cmVjdCB4PSIwIiB5PSIyNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZmY0NTAwIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZjQ1MDAiLz48cmVjdCB4PSI1MCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjxyZWN0IHg9IjEwMCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjx0ZXh0IHg9Ijc1IiB5PSI3MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjYwIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlI8L3RleHQ+PC9zdmc+">
     <style>
         :root {
             --bg-color: #f0f0f0; --grid-color: #d1d1d1; --accent-orange: #ff4500;
@@ -32,9 +32,13 @@
             resize: both; overflow: auto; min-width: 60px; min-height: 60px;
             box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
             user-select: none; z-index: 10;
+            font-family: Arial, sans-serif;
+            text-transform: uppercase;
+            font-weight: bold;
         }
         .room-box:active { cursor: grabbing; box-shadow: 8px 8px 0px rgba(0,0,0,0.2); }
-        .dims { font-size: 0.75rem; color: #666; font-family: var(--font-sans); }
+        .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; }
+        .delete-btn { cursor: pointer; color: #ff0000; float: right; font-size: 1rem; }
         .line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
     </style>
 </head>
@@ -75,7 +79,6 @@
     <script>
         let rooms = [];
         let adjacencies = [];
-        // Bauhaus + Light Primary Palette
         const colors = ['#FF4500', '#0055ff', '#FFCC00', '#FFB3B3', '#D4E5FF', '#FFF5CC'];
         const scale = 15; 
         const SNAP_DIST = 20;
@@ -92,7 +95,7 @@
             box.style.height = size + 'px';
             box.style.left = '50px'; box.style.top = '50px';
             box.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-            box.innerHTML = `<strong>${name}</strong><br><span class="dims"></span>`;
+            box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
             
             new ResizeObserver(e => {
                 const b = e[0].target;
@@ -104,6 +107,15 @@
             document.getElementById('canvas').appendChild(box);
             rooms.push({ id, name });
             updateSelects();
+        }
+
+        function deleteRoom(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+            rooms = rooms.filter(r => r.id !== id);
+            adjacencies = adjacencies.filter(a => a.a !== id && a.b !== id);
+            updateSelects();
+            renderLines();
         }
 
         function updateSelects() {
@@ -141,6 +153,7 @@
         }
 
         function startDrag(e) {
+            if (e.target.classList.contains('delete-btn')) return;
             let el = e.target.closest('.room-box');
             let shiftX = e.clientX - el.getBoundingClientRect().left;
             let shiftY = e.clientY - el.getBoundingClientRect().top;
@@ -150,18 +163,17 @@
                 let left = e.clientX - shiftX - canvas.left;
                 let top = e.clientY - shiftY - canvas.top;
 
-                // Snap Logic
                 rooms.forEach(r => {
                     if (r.id === el.id) return;
                     let target = document.getElementById(r.id);
                     let tx = target.offsetLeft, ty = target.offsetTop;
                     let tw = target.offsetWidth, th = target.offsetHeight;
 
-                    if (Math.abs(left - (tx + tw)) < SNAP_DIST) left = tx + tw; // Snap right
-                    else if (Math.abs(left + el.offsetWidth - tx) < SNAP_DIST) left = tx - el.offsetWidth; // Snap left
+                    if (Math.abs(left - (tx + tw)) < SNAP_DIST) left = tx + tw;
+                    else if (Math.abs(left + el.offsetWidth - tx) < SNAP_DIST) left = tx - el.offsetWidth;
                     
-                    if (Math.abs(top - (ty + th)) < SNAP_DIST) top = ty + th; // Snap bottom
-                    else if (Math.abs(top + el.offsetHeight - ty) < SNAP_DIST) top = ty - el.offsetHeight; // Snap top
+                    if (Math.abs(top - (ty + th)) < SNAP_DIST) top = ty + th;
+                    else if (Math.abs(top + el.offsetHeight - ty) < SNAP_DIST) top = ty - el.offsetHeight;
                 });
 
                 el.style.left = left + 'px';
