@@ -9,6 +9,8 @@
             --bg-color: #f0f0f0; --grid-color: #d1d1d1; --accent-orange: #ff4500;
             --text-main: #1a1a1a; --font-serif: 'Playfair Display', Georgia, serif;
             --font-sans: 'Inter', Helvetica, sans-serif;
+            --col-yellow: #FFCC00; --col-green: #77DD77;
+            --col-orange: #FF4500; --col-neutral: #E0E0E0;
         }
 
         body {
@@ -22,6 +24,7 @@
         }
 
         header { border-bottom: 1px solid var(--text-main); margin-bottom: 2rem; }
+        footer { margin-top: 40px; border-top: 1px solid var(--text-main); padding-top: 20px; font-family: Arial, sans-serif; font-size: 0.8rem; }
         .workspace-grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
         .controls { background: white; padding: 20px; border: 1px solid #ccc; height: fit-content; }
         .canvas-area { height: 80vh; position: relative; border: 1px dashed var(--text-main); background: #fafafa; overflow: hidden; }
@@ -37,9 +40,12 @@
             font-weight: bold;
         }
         .room-box:active { cursor: grabbing; box-shadow: 8px 8px 0px rgba(0,0,0,0.2); }
-        .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; }
-        .delete-btn { cursor: pointer; color: #ff0000; float: right; font-size: 1rem; }
-        .line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
+        .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; margin-top: 5px; }
+        .delete-btn { cursor: pointer; color: #cc0000; float: right; font-size: 1rem; }
+        .line { stroke: var(--text-main); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
+        
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-family: Arial, sans-serif; font-size: 0.8rem; }
+        .swatch { width: 15px; height: 15px; margin-right: 10px; border: 1px solid #000; }
     </style>
 </head>
 <body>
@@ -48,12 +54,18 @@
 
     <div class="workspace-grid">
         <div class="controls">
-            <h3>Program (Meters)</h3>
+            <h3>Key / Legend</h3>
+            <div id="legend"></div>
+
+            <h3 style="margin-top:40px;">Program (Meters)</h3>
             <label>Room Type:</label><br>
             <select id="rName" style="width: 100%; margin-bottom: 10px;">
-                <option value="Kitchen">Kitchen</option><option value="Living">Living</option>
-                <option value="Dining">Dining</option><option value="Bedroom">Bedroom</option>
-                <option value="Bathroom">Bathroom</option><option value="Hallway">Hallway</option>
+                <option value="Living">Living (Open Plan)</option>
+                <option value="Kitchen">Kitchen (Open Plan)</option>
+                <option value="Dining">Dining (Open Plan)</option>
+                <option value="Circulation">Circulation</option>
+                <option value="Exterior">Exterior / Grass</option>
+                <option value="Bedroom">Bedroom</option>
                 <option value="Office">Office</option>
             </select><br>
             <label>Area (sqm):</label><br>
@@ -63,7 +75,7 @@
                 <option value="70">70</option><option value="80">80</option><option value="90">90</option>
                 <option value="100">100</option>
             </select>
-            <button onclick="addRoom()" style="background:var(--accent-orange); color:white; border:none; padding:10px; width:100%; cursor:pointer;">Generate Box</button>
+            <button onclick="addRoom()" style="background:var(--accent-orange); color:white; border:none; padding:10px; width:100%; cursor:pointer;">START PROJECT</button>
 
             <h3 style="margin-top:40px;">Adjacency</h3>
             <select id="roomA" style="width:100%"></select> <span>near</span>
@@ -76,30 +88,50 @@
         </div>
     </div>
 
+    <footer>
+        <p>&copy; 2026 RESEARCH DESK. All rights reserved. | Contact: hello@researchdesk.com</p>
+    </footer>
+
     <script>
         let rooms = [];
         let adjacencies = [];
-        const colors = ['#FF4500', '#0055ff', '#FFCC00', '#FFB3B3', '#D4E5FF', '#FFF5CC'];
         const scale = 15; 
         const SNAP_DIST = 20;
+
+        const colorMap = {
+            "Living": "#FFCC00", "Kitchen": "#FFCC00", "Dining": "#FFCC00",
+            "Circulation": "#FF4500", "Exterior": "#77DD77",
+            "Bedroom": "#D4E5FF", "Office": "#FFB3B3"
+        };
+
+        const legendDiv = document.getElementById('legend');
+        Object.entries(colorMap).forEach(([name, color]) => {
+            legendDiv.innerHTML += `<div class="legend-item"><div class="swatch" style="background:${color}"></div>${name}</div>`;
+        });
 
         function addRoom() {
             const name = document.getElementById('rName').value;
             const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value)) * scale;
             const id = 'room-' + Date.now();
+            const color = colorMap[name] || '#E0E0E0';
+            const offset = rooms.length * 30;
             
             const box = document.createElement('div');
             box.className = 'room-box';
             box.id = id;
             box.style.width = size + 'px';
             box.style.height = size + 'px';
-            box.style.left = '50px'; box.style.top = '50px';
-            box.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            box.style.left = (50 + offset) + 'px'; 
+            box.style.top = (50 + offset) + 'px';
+            box.style.backgroundColor = color;
             box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
             
             new ResizeObserver(e => {
                 const b = e[0].target;
-                b.querySelector('.dims').innerText = `${(b.offsetWidth/scale).toFixed(0)}m x ${(b.offsetHeight/scale).toFixed(0)}m`;
+                const w = (b.offsetWidth/scale).toFixed(0);
+                const h = (b.offsetHeight/scale).toFixed(0);
+                const area = (w * h);
+                b.querySelector('.dims').innerText = `${w}m x ${h}m | ${area}sqm`;
                 renderLines();
             }).observe(box);
 
