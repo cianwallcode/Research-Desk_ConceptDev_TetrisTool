@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <title>RESEARCH DESK</title>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB4PSIwIiB5PSIyNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZmY0NTAwIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZjQ1MDAiLz48cmVjdCB4PSI1MCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjxyZWN0IHg9IjEwMCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjwvc3ZnPg==">
     <style>
         :root {
             --bg-color: #f0f0f0; --grid-color: #d1d1d1; --accent-orange: #ff4500;
@@ -19,7 +22,6 @@
         }
 
         header { border-bottom: 1px solid var(--text-main); margin-bottom: 2rem; }
-        
         .workspace-grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
         .controls { background: white; padding: 20px; border: 1px solid #ccc; height: fit-content; }
         .canvas-area { height: 80vh; position: relative; border: 1px dashed var(--text-main); background: #fafafa; overflow: hidden; }
@@ -33,7 +35,6 @@
         }
         .room-box:active { cursor: grabbing; box-shadow: 8px 8px 0px rgba(0,0,0,0.2); }
         .dims { font-size: 0.75rem; color: #666; font-family: var(--font-sans); }
-
         .line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
     </style>
 </head>
@@ -44,16 +45,25 @@
     <div class="workspace-grid">
         <div class="controls">
             <h3>Program (Meters)</h3>
-            <label>Name:</label><br>
-            <input type="text" id="rName" style="width: 90%; margin-bottom: 10px;">
-            <br>
-            <label>Area (square meters):</label><br>
-            <input type="number" id="rSqm" style="width: 90%; margin-bottom: 10px;">
+            <label>Room Type:</label><br>
+            <select id="rName" style="width: 100%; margin-bottom: 10px;">
+                <option value="Kitchen">Kitchen</option><option value="Living">Living</option>
+                <option value="Dining">Dining</option><option value="Bedroom">Bedroom</option>
+                <option value="Bathroom">Bathroom</option><option value="Hallway">Hallway</option>
+                <option value="Office">Office</option>
+            </select><br>
+            <label>Area (sqm):</label><br>
+            <select id="rSqm" style="width: 100%; margin-bottom: 10px;">
+                <option value="10">10</option><option value="20">20</option><option value="30">30</option>
+                <option value="40">40</option><option value="50">50</option><option value="60">60</option>
+                <option value="70">70</option><option value="80">80</option><option value="90">90</option>
+                <option value="100">100</option>
+            </select>
             <button onclick="addRoom()" style="background:var(--accent-orange); color:white; border:none; padding:10px; width:100%; cursor:pointer;">Generate Box</button>
 
             <h3 style="margin-top:40px;">Adjacency</h3>
-            <select id="roomA"></select> <span>to</span>
-            <select id="roomB"></select>
+            <select id="roomA" style="width:100%"></select> <span>near</span>
+            <select id="roomB" style="width:100%"></select>
             <button onclick="addAdjacency()" style="margin-top:10px; display:block; width:100%;">Connect</button>
         </div>
 
@@ -65,12 +75,14 @@
     <script>
         let rooms = [];
         let adjacencies = [];
-        const colors = ['#e6e6e6', '#d1d8e0', '#c8d6e5', '#f7d794', '#cf6a87', '#778beb'];
-        const scale = 15; // 15px = 1 meter
+        // Bauhaus + Light Primary Palette
+        const colors = ['#FF4500', '#0055ff', '#FFCC00', '#FFB3B3', '#D4E5FF', '#FFF5CC'];
+        const scale = 15; 
+        const SNAP_DIST = 20;
 
         function addRoom() {
-            const name = document.getElementById('rName').value || 'Room';
-            const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value) || 20) * scale;
+            const name = document.getElementById('rName').value;
+            const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value)) * scale;
             const id = 'room-' + Date.now();
             
             const box = document.createElement('div');
@@ -82,12 +94,9 @@
             box.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
             box.innerHTML = `<strong>${name}</strong><br><span class="dims"></span>`;
             
-            // Watch for resize to update labels
-            new ResizeObserver(entries => {
-                const box = entries[0].target;
-                const w = (box.offsetWidth / scale).toFixed(1);
-                const h = (box.offsetHeight / scale).toFixed(1);
-                box.querySelector('.dims').innerText = `${w}m x ${h}m`;
+            new ResizeObserver(e => {
+                const b = e[0].target;
+                b.querySelector('.dims').innerText = `${(b.offsetWidth/scale).toFixed(0)}m x ${(b.offsetHeight/scale).toFixed(0)}m`;
                 renderLines();
             }).observe(box);
 
@@ -98,8 +107,8 @@
         }
 
         function updateSelects() {
-            const selects = [document.getElementById('roomA'), document.getElementById('roomB')];
-            selects.forEach(s => {
+            const sels = [document.getElementById('roomA'), document.getElementById('roomB')];
+            sels.forEach(s => {
                 s.innerHTML = '';
                 rooms.forEach(r => {
                     let opt = document.createElement('option');
@@ -121,7 +130,6 @@
                 const elA = document.getElementById(adj.a);
                 const elB = document.getElementById(adj.b);
                 if (!elA || !elB) return;
-
                 const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                 line.setAttribute("x1", elA.offsetLeft + elA.offsetWidth/2);
                 line.setAttribute("y1", elA.offsetTop + elA.offsetHeight/2);
@@ -133,27 +141,36 @@
         }
 
         function startDrag(e) {
-            // Ignore if clicking the input or text selection
-            if (e.target.tagName === 'INPUT') return;
-            
             let el = e.target.closest('.room-box');
             let shiftX = e.clientX - el.getBoundingClientRect().left;
             let shiftY = e.clientY - el.getBoundingClientRect().top;
+            const canvas = document.getElementById('canvas').getBoundingClientRect();
             
             function move(e) {
-                const canvas = document.getElementById('canvas').getBoundingClientRect();
-                el.style.left = (e.clientX - shiftX - canvas.left) + 'px';
-                el.style.top = (e.clientY - shiftY - canvas.top) + 'px';
+                let left = e.clientX - shiftX - canvas.left;
+                let top = e.clientY - shiftY - canvas.top;
+
+                // Snap Logic
+                rooms.forEach(r => {
+                    if (r.id === el.id) return;
+                    let target = document.getElementById(r.id);
+                    let tx = target.offsetLeft, ty = target.offsetTop;
+                    let tw = target.offsetWidth, th = target.offsetHeight;
+
+                    if (Math.abs(left - (tx + tw)) < SNAP_DIST) left = tx + tw; // Snap right
+                    else if (Math.abs(left + el.offsetWidth - tx) < SNAP_DIST) left = tx - el.offsetWidth; // Snap left
+                    
+                    if (Math.abs(top - (ty + th)) < SNAP_DIST) top = ty + th; // Snap bottom
+                    else if (Math.abs(top + el.offsetHeight - ty) < SNAP_DIST) top = ty - el.offsetHeight; // Snap top
+                });
+
+                el.style.left = left + 'px';
+                el.style.top = top + 'px';
                 renderLines();
             }
             
-            function stopDrag() {
-                document.removeEventListener('mousemove', move);
-                document.removeEventListener('mouseup', stopDrag);
-            }
-            
             document.addEventListener('mousemove', move);
-            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('mouseup', () => document.removeEventListener('mousemove', move));
         }
     </script>
 </body>
