@@ -2,143 +2,158 @@
 <html lang="en">
 <head>
     <style>
-        /* DESIGN TOKENS */
         :root {
-            --bg-color: #f0f0f0;
-            --grid-color: #d1d1d1;
-            --accent-orange: #ff4500;
-            --text-main: #1a1a1a;
-            --font-serif: 'Playfair Display', Georgia, serif;
+            --bg-color: #f0f0f0; --grid-color: #d1d1d1; --accent-orange: #ff4500;
+            --text-main: #1a1a1a; --font-serif: 'Playfair Display', Georgia, serif;
             --font-sans: 'Inter', Helvetica, sans-serif;
         }
 
         body {
             background-color: var(--bg-color);
-            background-image: 
-                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
-                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-image: linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                              linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
             background-size: 40px 40px;
             font-family: var(--font-serif);
             color: var(--text-main);
-            margin: 0;
-            padding: 2rem;
-            min-height: 150vh; /* Ensures scrollable landing page */
+            margin: 0; padding: 2rem;
         }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 2rem;
-            border-bottom: 1px solid var(--text-main);
-        }
-
-        .logo { cursor: pointer; font-family: var(--font-sans); }
-        nav a { margin-left: 20px; text-decoration: none; color: var(--text-main); font-family: var(--font-sans); }
-
-        .cta-button {
-            background-color: var(--accent-orange);
-            color: white;
-            font-family: var(--font-sans);
-            font-weight: bold;
-            text-transform: uppercase;
-            padding: 1rem 2rem;
-            border: none;
-            cursor: pointer;
-        }
-
-        footer {
-            margin-top: 5rem;
-            font-family: var(--font-sans);
-            font-size: 0.8rem;
-            border-top: 1px solid var(--text-main);
-            padding-top: 1rem;
-        }
-
-        /* WORKSPACE */
-        #workspace { display: none; }
+        header { border-bottom: 1px solid var(--text-main); margin-bottom: 2rem; }
+        
+        .workspace-grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+        .controls { background: white; padding: 20px; border: 1px solid #ccc; height: fit-content; }
+        .canvas-area { height: 80vh; position: relative; border: 1px dashed var(--text-main); background: #fafafa; overflow: hidden; }
+        
         .room-box {
-            position: absolute;
-            border: 2px solid var(--text-main);
-            background-color: white;
-            padding: 10px;
-            cursor: move;
-            display: flex;
-            flex-direction: column;
-            resize: both;
-            overflow: auto;
-            min-width: 50px;
-            min-height: 50px;
+            position: absolute; border: 2px solid var(--text-main);
+            padding: 10px; cursor: grab; display: flex; flex-direction: column;
+            resize: both; overflow: auto; min-width: 60px; min-height: 60px;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
+            user-select: none; z-index: 10;
         }
-        .canvas-area { height: 80vh; position: relative; border: 1px dashed var(--text-main); margin-top: 20px; }
+        .room-box:active { cursor: grabbing; box-shadow: 8px 8px 0px rgba(0,0,0,0.2); }
+        .dims { font-size: 0.75rem; color: #666; font-family: var(--font-sans); }
+
+        .line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1 class="logo" onclick="showPage('landing')">RESEARCH DESK</h1>
-        <nav>
-            <a href="#" onclick="showPage('inventory')">Inventory</a>
-            <a href="#" onclick="showPage('comparison')">Comparison</a>
-        </nav>
-    </header>
+    <header><h1>RESEARCH DESK</h1></header>
 
-    <main id="landing">
-        <h2>PROJECT ARCHIVE</h2>
-        <p>Rationalist digital infrastructure for curated research.</p>
-        <button class="cta-button" onclick="showPage('workspace')">Start Project</button>
-    </main>
-
-    <main id="workspace">
+    <div class="workspace-grid">
         <div class="controls">
-            <input type="text" id="roomName" placeholder="Room Name">
-            <input type="number" id="sqm" placeholder="Area (sqm)">
-            <button class="cta-button" onclick="addRoom()">Add Box</button>
+            <h3>Program (Meters)</h3>
+            <label>Name:</label><br>
+            <input type="text" id="rName" style="width: 90%; margin-bottom: 10px;">
+            <br>
+            <label>Area (square meters):</label><br>
+            <input type="number" id="rSqm" style="width: 90%; margin-bottom: 10px;">
+            <button onclick="addRoom()" style="background:var(--accent-orange); color:white; border:none; padding:10px; width:100%; cursor:pointer;">Generate Box</button>
+
+            <h3 style="margin-top:40px;">Adjacency</h3>
+            <select id="roomA"></select> <span>to</span>
+            <select id="roomB"></select>
+            <button onclick="addAdjacency()" style="margin-top:10px; display:block; width:100%;">Connect</button>
         </div>
-        <div id="canvas" class="canvas-area"></div>
-    </main>
 
-    <main id="inventory" style="display:none;"><h2>Inventory</h2><p>Blank.</p></main>
-    <main id="comparison" style="display:none;"><h2>Comparison</h2><p>Blank.</p></main>
-
-    <footer>
-        <p>&copy; 2026 Research Desk. All rights reserved.</p>
-        <p>Contact: archives@researchdesk.example</p>
-    </footer>
+        <div id="canvas" class="canvas-area">
+            <svg id="svgLayer" style="position:absolute; top:0; left:0; width:100%; height:100%;"></svg>
+        </div>
+    </div>
 
     <script>
-        function showPage(id) {
-            document.getElementById('landing').style.display = (id === 'landing') ? 'block' : 'none';
-            document.getElementById('workspace').style.display = (id === 'workspace') ? 'block' : 'none';
-            document.getElementById('inventory').style.display = (id === 'inventory') ? 'block' : 'none';
-            document.getElementById('comparison').style.display = (id === 'comparison') ? 'block' : 'none';
-        }
+        let rooms = [];
+        let adjacencies = [];
+        const colors = ['#e6e6e6', '#d1d8e0', '#c8d6e5', '#f7d794', '#cf6a87', '#778beb'];
+        const scale = 15; // 15px = 1 meter
 
         function addRoom() {
-            const name = document.getElementById('roomName').value || 'Room';
-            const size = parseFloat(document.getElementById('sqm').value) || 20;
-            const side = Math.sqrt(size) * 10; // Scaled for interface
-
+            const name = document.getElementById('rName').value || 'Room';
+            const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value) || 20) * scale;
+            const id = 'room-' + Date.now();
+            
             const box = document.createElement('div');
             box.className = 'room-box';
-            box.style.width = side + 'px';
-            box.style.height = side + 'px';
-            box.style.left = '50px';
-            box.style.top = '100px';
-            box.innerHTML = `<span>${name}</span><input type="color" onchange="this.parentElement.style.backgroundColor = this.value">`;
+            box.id = id;
+            box.style.width = size + 'px';
+            box.style.height = size + 'px';
+            box.style.left = '50px'; box.style.top = '50px';
+            box.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            box.innerHTML = `<strong>${name}</strong><br><span class="dims"></span>`;
+            
+            // Watch for resize to update labels
+            new ResizeObserver(entries => {
+                const box = entries[0].target;
+                const w = (box.offsetWidth / scale).toFixed(1);
+                const h = (box.offsetHeight / scale).toFixed(1);
+                box.querySelector('.dims').innerText = `${w}m x ${h}m`;
+                renderLines();
+            }).observe(box);
 
-            box.onmousedown = function(e) {
-                let shiftX = e.clientX - box.getBoundingClientRect().left;
-                let shiftY = e.clientY - box.getBoundingClientRect().top;
-                function moveAt(pageX, pageY) {
-                    box.style.left = pageX - shiftX + 'px';
-                    box.style.top = pageY - shiftY + 'px';
-                }
-                function onMouseMove(e) { moveAt(e.pageX, e.pageY); }
-                document.addEventListener('mousemove', onMouseMove);
-                box.onmouseup = function() { document.removeEventListener('mousemove', onMouseMove); };
-            };
+            box.onmousedown = startDrag;
             document.getElementById('canvas').appendChild(box);
+            rooms.push({ id, name });
+            updateSelects();
+        }
+
+        function updateSelects() {
+            const selects = [document.getElementById('roomA'), document.getElementById('roomB')];
+            selects.forEach(s => {
+                s.innerHTML = '';
+                rooms.forEach(r => {
+                    let opt = document.createElement('option');
+                    opt.value = r.id; opt.innerText = r.name;
+                    s.appendChild(opt);
+                });
+            });
+        }
+
+        function addAdjacency() {
+            adjacencies.push({ a: document.getElementById('roomA').value, b: document.getElementById('roomB').value });
+            renderLines();
+        }
+
+        function renderLines() {
+            const svg = document.getElementById('svgLayer');
+            svg.innerHTML = '';
+            adjacencies.forEach(adj => {
+                const elA = document.getElementById(adj.a);
+                const elB = document.getElementById(adj.b);
+                if (!elA || !elB) return;
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", elA.offsetLeft + elA.offsetWidth/2);
+                line.setAttribute("y1", elA.offsetTop + elA.offsetHeight/2);
+                line.setAttribute("x2", elB.offsetLeft + elB.offsetWidth/2);
+                line.setAttribute("y2", elB.offsetTop + elB.offsetHeight/2);
+                line.setAttribute("class", "line");
+                svg.appendChild(line);
+            });
+        }
+
+        function startDrag(e) {
+            // Ignore if clicking the input or text selection
+            if (e.target.tagName === 'INPUT') return;
+            
+            let el = e.target.closest('.room-box');
+            let shiftX = e.clientX - el.getBoundingClientRect().left;
+            let shiftY = e.clientY - el.getBoundingClientRect().top;
+            
+            function move(e) {
+                const canvas = document.getElementById('canvas').getBoundingClientRect();
+                el.style.left = (e.clientX - shiftX - canvas.left) + 'px';
+                el.style.top = (e.clientY - shiftY - canvas.top) + 'px';
+                renderLines();
+            }
+            
+            function stopDrag() {
+                document.removeEventListener('mousemove', move);
+                document.removeEventListener('mouseup', stopDrag);
+            }
+            
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', stopDrag);
         }
     </script>
 </body>
