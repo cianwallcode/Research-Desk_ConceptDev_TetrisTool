@@ -2,50 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>RESEARCH DESK</title>
-    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgMTI1Ij48cmVjdCB4PSIwIiB5PSIyNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZmY0NTAwIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZjQ1MDAiLz48cmVjdCB4PSI1MCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjxyZWN0IHg9IjEwMCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjx0ZXh0IHg9Ijc1IiB5PSI3MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjYwIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlI8L3RleHQ+PC9zdmc+">
+    <title>RESEARCH DESK: 3D AXONOMETRIC</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         :root {
             --bg-color: #f0f0f0; --grid-color: #d1d1d1; --accent-orange: #ff4500;
-            --text-main: #1a1a1a; --font-serif: 'Playfair Display', Georgia, serif;
-            --font-sans: 'Inter', Helvetica, sans-serif;
-            --col-yellow: #FFCC00; --col-green: #77DD77;
+            --text-main: #1a1a1a; --col-yellow: #FFCC00; --col-green: #77DD77;
             --col-orange: #FF4500; --col-neutral: #E0E0E0;
         }
-
-        body {
-            background-color: var(--bg-color);
-            background-image: linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
-                              linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
-            background-size: 40px 40px;
-            font-family: var(--font-serif);
-            color: var(--text-main);
-            margin: 0; padding: 2rem;
-        }
-
-        header { border-bottom: 1px solid var(--text-main); margin-bottom: 2rem; }
-        footer { margin-top: 40px; border-top: 1px solid var(--text-main); padding-top: 20px; font-family: Arial, sans-serif; font-size: 0.8rem; }
-        .workspace-grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
-        .controls { background: white; padding: 20px; border: 1px solid #ccc; height: fit-content; }
-        .canvas-area { height: 80vh; position: relative; border: 1px dashed var(--text-main); background: #fafafa; overflow: hidden; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: var(--bg-color); }
+        .workspace-grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; height: 85vh; }
+        .controls { background: white; padding: 20px; border: 1px solid #ccc; overflow-y: auto; }
+        .view-port { position: relative; border: 2px solid var(--text-main); background: #fff; overflow: hidden; }
+        #canvas-2d { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 1; }
+        #canvas-3d { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 0; }
         
         .room-box {
-            position: absolute; border: 2px solid var(--text-main);
-            padding: 10px; cursor: grab; display: flex; flex-direction: column;
-            resize: both; overflow: auto; min-width: 60px; min-height: 60px;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
-            user-select: none; z-index: 10;
-            font-family: Arial, sans-serif;
-            text-transform: uppercase;
-            font-weight: bold;
+            position: absolute; border: 2px solid var(--text-main); padding: 5px; cursor: grab;
+            display: flex; flex-direction: column; resize: both; overflow: auto; min-width: 60px; min-height: 60px;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1); user-select: none; z-index: 10;
+            font-family: Arial, sans-serif; text-transform: uppercase; font-weight: bold; font-size: 10px;
         }
-        .room-box:active { cursor: grabbing; box-shadow: 8px 8px 0px rgba(0,0,0,0.2); }
-        .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; margin-top: 5px; }
-        .delete-btn { cursor: pointer; color: #cc0000; float: right; font-size: 1rem; }
-        .line { stroke: var(--text-main); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
-        
-        .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-family: Arial, sans-serif; font-size: 0.8rem; }
-        .swatch { width: 15px; height: 15px; margin-right: 10px; border: 1px solid #000; }
+        .delete-btn { cursor: pointer; color: #cc0000; float: right; }
     </style>
 </head>
 <body>
@@ -54,134 +32,82 @@
 
     <div class="workspace-grid">
         <div class="controls">
-            <h3>Key / Legend</h3>
-            <div id="legend"></div>
-
-            <h3 style="margin-top:40px;">Program (Meters)</h3>
-            <label>Room Type:</label><br>
-            <select id="rName" style="width: 100%; margin-bottom: 10px;">
-                <option value="Living">Living (Open Plan)</option>
-                <option value="Kitchen">Kitchen (Open Plan)</option>
-                <option value="Dining">Dining (Open Plan)</option>
-                <option value="Circulation">Circulation</option>
-                <option value="Exterior">Exterior / Grass</option>
-                <option value="Bedroom">Bedroom</option>
-                <option value="Office">Office</option>
-            </select><br>
-            <label>Area (sqm):</label><br>
-            <select id="rSqm" style="width: 100%; margin-bottom: 10px;">
-                <option value="10">10</option><option value="20">20</option><option value="30">30</option>
-                <option value="40">40</option><option value="50">50</option><option value="60">60</option>
-                <option value="70">70</option><option value="80">80</option><option value="90">90</option>
-                <option value="100">100</option>
+            <h3>Program</h3>
+            <select id="rName" style="width: 100%;">
+                <option value="Living">Living</option><option value="Kitchen">Kitchen</option>
+                <option value="Circulation">Circulation</option><option value="Exterior">Exterior</option>
             </select>
-            <button onclick="addRoom()" style="background:var(--accent-orange); color:white; border:none; padding:10px; width:100%; cursor:pointer;">START PROJECT</button>
-
-            <h3 style="margin-top:40px;">Adjacency</h3>
-            <select id="roomA" style="width:100%"></select> <span>near</span>
-            <select id="roomB" style="width:100%"></select>
-            <button onclick="addAdjacency()" style="margin-top:10px; display:block; width:100%;">Connect</button>
+            <button onclick="addRoom()" style="background:var(--accent-orange); color:white; width:100%; margin-top:10px;">ADD ROOM</button>
+            <label style="display:block; margin-top:20px;">Toggle View:</label>
+            <button onclick="toggleView()">SWITCH 2D / 3D</button>
         </div>
 
-        <div id="canvas" class="canvas-area">
-            <svg id="svgLayer" style="position:absolute; top:0; left:0; width:100%; height:100%;"></svg>
+        <div class="view-port">
+            <div id="canvas-2d"></div>
+            <div id="canvas-3d"></div>
         </div>
     </div>
 
-    <footer>
-        <p>&copy; 2026 RESEARCH DESK. All rights reserved. | Contact: hello@researchdesk.com</p>
-    </footer>
-
     <script>
         let rooms = [];
-        let adjacencies = [];
-        const scale = 15; 
-        const SNAP_DIST = 20;
+        let scene, camera, renderer, mode = '2d';
+        const colorMap = { "Living": 0xFFCC00, "Kitchen": 0xFFCC00, "Circulation": 0xFF4500, "Exterior": 0x77DD77 };
 
-        const colorMap = {
-            "Living": "#FFCC00", "Kitchen": "#FFCC00", "Dining": "#FFCC00",
-            "Circulation": "#FF4500", "Exterior": "#77DD77",
-            "Bedroom": "#D4E5FF", "Office": "#FFB3B3"
-        };
+        // 3D Setup
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+            camera = new THREE.OrthographicCamera(-20, 20, 20, -20, 0.1, 1000);
+            camera.position.set(10, 10, 10);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(document.querySelector('.view-port').clientWidth, document.querySelector('.view-port').clientHeight);
+            document.getElementById('canvas-3d').appendChild(renderer.domElement);
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(5, 10, 5);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+            animate();
+        }
 
-        const legendDiv = document.getElementById('legend');
-        Object.entries(colorMap).forEach(([name, color]) => {
-            legendDiv.innerHTML += `<div class="legend-item"><div class="swatch" style="background:${color}"></div>${name}</div>`;
-        });
+        function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+
+        function update3D() {
+            scene.children = scene.children.filter(c => c.type !== 'Mesh');
+            rooms.forEach(r => {
+                const el = document.getElementById(r.id);
+                const geom = new THREE.BoxGeometry(el.offsetWidth/20, 1, el.offsetHeight/20);
+                const mat = new THREE.MeshLambertMaterial({ color: colorMap[r.name] || 0xcccccc });
+                const cube = new THREE.Mesh(geom, mat);
+                cube.position.set((el.offsetLeft - 300)/20, 0, (el.offsetTop)/20);
+                scene.add(cube);
+            });
+        }
+
+        function toggleView() {
+            mode = (mode === '2d') ? '3d' : '2d';
+            document.getElementById('canvas-2d').style.zIndex = (mode === '2d') ? 10 : 0;
+            document.getElementById('canvas-3d').style.zIndex = (mode === '3d') ? 10 : 0;
+            if (mode === '3d') update3D();
+        }
 
         function addRoom() {
             const name = document.getElementById('rName').value;
-            const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value)) * scale;
             const id = 'room-' + Date.now();
-            const color = colorMap[name] || '#E0E0E0';
-            const offset = rooms.length * 30;
-            
             const box = document.createElement('div');
-            box.className = 'room-box';
-            box.id = id;
-            box.style.width = size + 'px';
-            box.style.height = size + 'px';
-            box.style.left = (50 + offset) + 'px'; 
-            box.style.top = (50 + offset) + 'px';
-            box.style.backgroundColor = color;
-            box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
-            
-            new ResizeObserver(e => {
-                const b = e[0].target;
-                const w = (b.offsetWidth/scale).toFixed(0);
-                const h = (b.offsetHeight/scale).toFixed(0);
-                const area = (w * h);
-                b.querySelector('.dims').innerText = `${w}m x ${h}m | ${area}sqm`;
-                renderLines();
-            }).observe(box);
-
+            box.className = 'room-box'; box.id = id;
+            box.style.width = '100px'; box.style.height = '100px';
+            box.style.left = '50px'; box.style.top = '50px';
+            box.style.backgroundColor = '#' + colorMap[name].toString(16);
+            box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div>`;
             box.onmousedown = startDrag;
-            document.getElementById('canvas').appendChild(box);
+            document.getElementById('canvas-2d').appendChild(box);
             rooms.push({ id, name });
-            updateSelects();
         }
 
         function deleteRoom(id) {
-            const el = document.getElementById(id);
-            if (el) el.remove();
+            document.getElementById(id).remove();
             rooms = rooms.filter(r => r.id !== id);
-            adjacencies = adjacencies.filter(a => a.a !== id && a.b !== id);
-            updateSelects();
-            renderLines();
-        }
-
-        function updateSelects() {
-            const sels = [document.getElementById('roomA'), document.getElementById('roomB')];
-            sels.forEach(s => {
-                s.innerHTML = '';
-                rooms.forEach(r => {
-                    let opt = document.createElement('option');
-                    opt.value = r.id; opt.innerText = r.name;
-                    s.appendChild(opt);
-                });
-            });
-        }
-
-        function addAdjacency() {
-            adjacencies.push({ a: document.getElementById('roomA').value, b: document.getElementById('roomB').value });
-            renderLines();
-        }
-
-        function renderLines() {
-            const svg = document.getElementById('svgLayer');
-            svg.innerHTML = '';
-            adjacencies.forEach(adj => {
-                const elA = document.getElementById(adj.a);
-                const elB = document.getElementById(adj.b);
-                if (!elA || !elB) return;
-                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                line.setAttribute("x1", elA.offsetLeft + elA.offsetWidth/2);
-                line.setAttribute("y1", elA.offsetTop + elA.offsetHeight/2);
-                line.setAttribute("x2", elB.offsetLeft + elB.offsetWidth/2);
-                line.setAttribute("y2", elB.offsetTop + elB.offsetHeight/2);
-                line.setAttribute("class", "line");
-                svg.appendChild(line);
-            });
         }
 
         function startDrag(e) {
@@ -189,33 +115,15 @@
             let el = e.target.closest('.room-box');
             let shiftX = e.clientX - el.getBoundingClientRect().left;
             let shiftY = e.clientY - el.getBoundingClientRect().top;
-            const canvas = document.getElementById('canvas').getBoundingClientRect();
-            
             function move(e) {
-                let left = e.clientX - shiftX - canvas.left;
-                let top = e.clientY - shiftY - canvas.top;
-
-                rooms.forEach(r => {
-                    if (r.id === el.id) return;
-                    let target = document.getElementById(r.id);
-                    let tx = target.offsetLeft, ty = target.offsetTop;
-                    let tw = target.offsetWidth, th = target.offsetHeight;
-
-                    if (Math.abs(left - (tx + tw)) < SNAP_DIST) left = tx + tw;
-                    else if (Math.abs(left + el.offsetWidth - tx) < SNAP_DIST) left = tx - el.offsetWidth;
-                    
-                    if (Math.abs(top - (ty + th)) < SNAP_DIST) top = ty + th;
-                    else if (Math.abs(top + el.offsetHeight - ty) < SNAP_DIST) top = ty - el.offsetHeight;
-                });
-
-                el.style.left = left + 'px';
-                el.style.top = top + 'px';
-                renderLines();
+                el.style.left = (e.clientX - shiftX - document.getElementById('canvas-2d').offsetLeft) + 'px';
+                el.style.top = (e.clientY - shiftY - document.getElementById('canvas-2d').offsetTop) + 'px';
             }
-            
             document.addEventListener('mousemove', move);
             document.addEventListener('mouseup', () => document.removeEventListener('mousemove', move));
         }
+
+        init3D();
     </script>
 </body>
 </html>
