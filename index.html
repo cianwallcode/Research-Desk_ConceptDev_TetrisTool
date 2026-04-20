@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>RESEARCH DESK</title>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgMTI1Ij48cmVjdCB4PSIwIiB5PSIyNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZmY0NTAwIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZjQ1MDAiLz48cmVjdCB4PSI1MCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjxyZWN0IHg9IjEwMCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjx0ZXh0IHg9Ijc1IiB5PSI3MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjYwIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlI8L3RleHQ+PC9zdmc+">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         :root { --bg-color: #f0f0f0; --accent-orange: #ff4500; --text-main: #1a1a1a; --grid-color: #d1d1d1; }
@@ -12,15 +13,19 @@
         
         .workspace-grid { display: grid; grid-template-columns: 300px 1fr 1fr; gap: 20px; height: 70vh; }
         .controls { background: white; padding: 20px; border: 1px solid #ccc; overflow-y: auto; }
-        .view-port { position: relative; border: 1px solid #ccc; background: #fafafa; overflow: hidden; }
         
-        /* 2D Canvas Overrides */
-        #canvas-2d { position: relative; }
+        /* 2D Canvas with Grid */
+        .view-port { position: relative; border: 1px solid #ccc; background: #fafafa; overflow: hidden; }
+        #canvas-2d { 
+            background-image: linear-gradient(to right, #e0e0e0 1px, transparent 1px), linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
         .room-box {
             position: absolute; border: 2px solid var(--text-main); padding: 10px; cursor: grab;
             display: flex; flex-direction: column; resize: both; overflow: auto; min-width: 60px; min-height: 60px;
             box-shadow: 4px 4px 0px rgba(0,0,0,0.1); user-select: none; z-index: 10;
-            font-weight: bold; text-transform: uppercase; font-size: 10px;
+            font-weight: bold; text-transform: uppercase; font-size: 10px; background-color: white;
         }
         .room-box.selected { border-color: blue; box-shadow: 0 0 10px blue; }
         .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; margin-top: 5px; }
@@ -28,7 +33,7 @@
         
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 0.8rem; }
         .swatch { width: 15px; height: 15px; margin-right: 10px; border: 1px solid #000; }
-        .line { stroke: var(--text-main); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
+        .line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -77,15 +82,14 @@
         let selectedId = null;
         let scene, camera, renderer;
         const scale = 15;
+        const SNAP_DIST = 20;
         const colorMap = { "Living": 0xFFCC00, "Kitchen": 0xFFCC00, "Circulation": 0xFF4500, "Exterior": 0x77DD77 };
 
-        // Initialize Legend
         const legendDiv = document.getElementById('legend');
         Object.entries(colorMap).forEach(([name, color]) => {
             legendDiv.innerHTML += `<div class="legend-item"><div class="swatch" style="background:#${color.toString(16).padStart(6, '0')}"></div>${name}</div>`;
         });
 
-        // 3D Setup
         function init3D() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xfafafa);
@@ -118,13 +122,15 @@
             const name = document.getElementById('rName').value;
             const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value)) * scale;
             const id = 'room-' + Date.now();
-            const w = (name === 'Circulation') ? size * 1.5 : size;
-            const h = (name === 'Circulation') ? size * 0.75 : size;
+            let w = (name === 'Circulation') ? size * 1.5 : size;
+            let h = (name === 'Circulation') ? size * 0.75 : size;
+            const offset = rooms.length * 25;
             
             const box = document.createElement('div');
             box.className = 'room-box'; box.id = id;
             box.style.width = w + 'px'; box.style.height = h + 'px';
-            box.style.left = '50px'; box.style.top = '50px';
+            box.style.left = (50 + offset) + 'px'; 
+            box.style.top = (50 + offset) + 'px';
             box.style.backgroundColor = '#' + colorMap[name].toString(16).padStart(6, '0');
             box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
             
@@ -162,7 +168,8 @@
         }
 
         function deleteRoom(id) {
-            document.getElementById(id).remove();
+            const el = document.getElementById(id);
+            if(el) el.remove();
             rooms = rooms.filter(r => r.id !== id);
             adjacencies = adjacencies.filter(a => a.a !== id && a.b !== id);
             updateSelects(); renderLines(); render3D();
@@ -207,9 +214,21 @@
             let el = e.target.closest('.room-box');
             let shiftX = e.clientX - el.getBoundingClientRect().left;
             let shiftY = e.clientY - el.getBoundingClientRect().top;
+            
             function move(e) {
-                el.style.left = (e.clientX - shiftX - document.getElementById('canvas-2d').offsetLeft) + 'px';
-                el.style.top = (e.clientY - shiftY - document.getElementById('canvas-2d').offsetTop) + 'px';
+                let left = e.clientX - shiftX - document.getElementById('canvas-2d').getBoundingClientRect().left;
+                let top = e.clientY - shiftY - document.getElementById('canvas-2d').getBoundingClientRect().top;
+
+                // Snapping Logic
+                rooms.forEach(r => {
+                    if (r.id === el.id) return;
+                    let target = document.getElementById(r.id);
+                    if (Math.abs(left - (target.offsetLeft + target.offsetWidth)) < SNAP_DIST) left = target.offsetLeft + target.offsetWidth;
+                    if (Math.abs(top - (target.offsetTop + target.offsetHeight)) < SNAP_DIST) top = target.offsetTop + target.offsetHeight;
+                });
+
+                el.style.left = left + 'px';
+                el.style.top = top + 'px';
                 renderLines(); render3D();
             }
             document.addEventListener('mousemove', move);
