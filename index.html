@@ -22,6 +22,7 @@
             font-weight: bold; text-transform: uppercase; font-size: 10px; background-color: white;
         }
         .room-box.selected { border-color: var(--accent-orange); box-shadow: 0 0 10px var(--accent-orange); }
+        .room-box.adjacent { border-color: green; }
         .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; margin-top: 5px; }
         .delete-btn { cursor: pointer; color: #cc0000; float: right; }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 0.8rem; }
@@ -37,18 +38,17 @@
         <div class="workspace-grid">
             <div class="controls">
                 <h3>Configuration</h3>
-                <label><input type="checkbox" id="snapToggle" checked> Snap to 1.2m Grid</label><br>
+                <label><input type="checkbox" id="snapGrid" checked> Snap to Grid</label><br>
+                <label><input type="checkbox" id="snapRooms" checked> Snap to Rooms</label><br>
                 <label><input type="checkbox" id="showGrid" onchange="renderGrid()"> Show Grid</label>
 
                 <h3 style="margin-top:20px;">Legend</h3>
                 <div id="legend"></div>
 
                 <h3 style="margin-top:20px;">Add Room</h3>
-                <select id="rName" style="width: 100%; margin-bottom: 5px;">
-                    <option value="Living">Living</option><option value="Kitchen">Kitchen</option>
-                    <option value="Bathroom">Bathroom</option><option value="Circulation">Circulation</option>
-                </select>
-                <button onclick="addRoom()" style="background:var(--accent-orange); color:white; width:100%; border:none; padding:10px; cursor:pointer;">START PROJECT</button>
+                <input type="text" id="rName" placeholder="Name" style="width:100%; margin-bottom:5px;"><br>
+                <input type="number" id="rSqm" placeholder="SQM" style="width:100%; margin-bottom:5px;"><br>
+                <button onclick="addCustomRoom()" style="background:var(--accent-orange); color:white; width:100%; border:none; padding:10px; cursor:pointer;">ADD ROOM</button>
 
                 <h3 style="margin-top:20px;">Height</h3>
                 <input type="range" id="hSlider" min="1" max="10" step="0.5" value="3" style="width:100%" oninput="updateHeight(this.value)">
@@ -69,12 +69,11 @@
     <script>
         let rooms = [];
         let selectedId = null;
-        let scene, camera, renderer; // Globals fixed
-        const scale = 15; 
+        let scene, camera, renderer;
+        const scale = 10; 
         const snapStep = 1.2 * scale;
         const colorMap = { "Living": "#FFCC00", "Kitchen": "#FFCC00", "Bathroom": "#D4E5FF", "Circulation": "#FFCC00" };
 
-        // Init Legend
         const legendDiv = document.getElementById('legend');
         Object.entries(colorMap).forEach(([name, color]) => {
             legendDiv.innerHTML += `<div class="legend-item"><div class="swatch" style="background:${color}"></div>${name}</div>`;
@@ -86,26 +85,30 @@
             if(!document.getElementById('showGrid').checked) return;
             
             let pos = 0;
-            let step24 = true;
-            for(let i=0; i<50; i++) {
+            let use24 = true;
+            for(let i=0; i<30; i++) {
                 let px = pos * scale;
                 svg.innerHTML += `<line x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#ddd" stroke-width="1"/>`;
                 svg.innerHTML += `<line x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#ddd" stroke-width="1"/>`;
-                pos += (step24 ? 2.4 : 7.2);
-                step24 = !step24;
+                svg.innerHTML += `<text x="${px+2}" y="15" font-size="10" fill="#999">${(pos).toFixed(1)}m</text>`;
+                pos += (use24 ? 2.4 : 7.2);
+                use24 = !use24;
             }
         }
 
-        function addRoom() {
-            const name = document.getElementById('rName').value;
+        function addCustomRoom() {
+            const name = document.getElementById('rName').value || "Custom";
+            const sqm = parseFloat(document.getElementById('rSqm').value) || 12;
+            const side = Math.sqrt(sqm) * scale;
             const id = 'room-' + Date.now();
+            
             const box = document.createElement('div');
             box.className = 'room-box'; box.id = id;
-            box.style.width = (2.4 * scale) + 'px'; 
-            box.style.height = (4.8 * scale) + 'px';
+            box.style.width = side + 'px'; 
+            box.style.height = side + 'px';
             box.style.left = '50px'; box.style.top = '50px';
-            box.style.backgroundColor = colorMap[name];
-            box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
+            box.style.backgroundColor = '#CCCCCC';
+            box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims">${sqm}sqm</span>`;
             
             box.onclick = () => selectRoom(id);
             box.onmousedown = startDrag;
@@ -135,6 +138,22 @@
             render3D();
         }
 
+        function checkAdjacency(el) {
+            el.classList.remove('adjacent');
+            const rect1 = el.getBoundingClientRect();
+            rooms.forEach(r => {
+                if(r.id === el.id) return;
+                const other = document.getElementById(r.id);
+                const rect2 = other.getBoundingClientRect();
+                
+                // If touching within 5px
+                if (!(rect1.right < rect2.left - 5 || rect1.left > rect2.right + 5 || 
+                      rect1.bottom < rect2.top - 5 || rect1.top > rect2.bottom + 5)) {
+                    el.classList.add('adjacent');
+                }
+            });
+        }
+
         function startDrag(e) {
             if (e.target.classList.contains('delete-btn')) return;
             let el = e.target.closest('.room-box');
@@ -146,11 +165,12 @@
                 let top = e.clientY - shiftY - document.getElementById('canvas-2d').getBoundingClientRect().top;
                 el.style.left = left + 'px';
                 el.style.top = top + 'px';
+                checkAdjacency(el);
             }
             
             function end() {
                 document.removeEventListener('mousemove', move);
-                if(document.getElementById('snapToggle').checked) {
+                if(document.getElementById('snapGrid').checked) {
                     el.style.left = Math.round(parseInt(el.style.left) / snapStep) * snapStep + 'px';
                     el.style.top = Math.round(parseInt(el.style.top) / snapStep) * snapStep + 'px';
                 }
@@ -163,7 +183,7 @@
         function init3D() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
-            camera = new THREE.OrthographicCamera(-20, 20, 20, -20, 0.1, 1000);
+            camera = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 1000);
             camera.position.set(20, 20, 20); 
             camera.lookAt(0, 0, 0);
             
@@ -188,18 +208,16 @@
             rooms.forEach(r => {
                 const el = document.getElementById(r.id);
                 const geom = new THREE.BoxGeometry(el.offsetWidth/scale, r.h, el.offsetHeight/scale);
-                const mat = new THREE.MeshLambertMaterial({ color: colorMap[r.name] });
+                const mat = new THREE.MeshLambertMaterial({ color: 0xff4500 });
                 const cube = new THREE.Mesh(geom, mat);
                 const edges = new THREE.EdgesGeometry(geom);
                 cube.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 })));
-                cube.position.set((parseInt(el.style.left) - 150)/scale, r.h/2, (parseInt(el.style.top) - 50)/scale);
+                cube.position.set((parseInt(el.style.left) - 100)/scale, r.h/2, (parseInt(el.style.top) - 100)/scale);
                 scene.add(cube);
             });
         }
 
-        window.onload = () => {
-            init3D();
-        };
+        window.onload = init3D;
     </script>
 </body>
 </html>
