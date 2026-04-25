@@ -50,6 +50,9 @@
                 <input type="number" id="cSqm" placeholder="SQM" style="width:95%; margin-bottom:5px;"><br>
                 <button onclick="addRoom()" style="background:var(--accent-orange); color:white; width:100%; border:none; padding:10px; cursor:pointer;">ADD ROOM</button>
 
+                <h3 style="margin-top:20px;">Room Properties</h3>
+                <label>Height (m): </label><input type="range" id="hSlider" min="1" max="10" step="0.5" value="3" style="width:100%" oninput="updateHeight(this.value)">
+
                 <h3 style="margin-top:20px;">Adjacency Link</h3>
                 <select id="link1" style="width:100%; margin-bottom:5px;"></select>
                 <select id="link2" style="width:100%; margin-bottom:5px;"></select>
@@ -132,6 +135,12 @@
             render3D();
         }
 
+        function updateHeight(val) {
+            if(!selectedId) return;
+            rooms.find(r => r.id === selectedId).h = parseFloat(val);
+            render3D();
+        }
+
         function updateLinkDropdowns() {
             const l1 = document.getElementById('link1'); const l2 = document.getElementById('link2');
             l1.innerHTML = ''; l2.innerHTML = '';
@@ -203,7 +212,6 @@
         function init3D() {
             scene = new THREE.Scene(); scene.background = new THREE.Color(0xffffff);
             const container = document.getElementById('canvas-3d');
-            // Reverted to Perspective Camera for true 3D
             camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
             camera.position.set(30, 30, 30); camera.lookAt(0, 0, 0);
             renderer = new THREE.WebGLRenderer({ antialias: true });
