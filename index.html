@@ -87,7 +87,7 @@
             for(let i=0; i<30; i++) {
                 let px = pos * scale;
                 svg.innerHTML += `<line class="grid-line" x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#eee"/>`;
-                svg.innerHTML += `<line class="grid-line" x1="0" y1="${px}" x2="100%" y1="${px}" stroke="#eee"/>`;
+                svg.innerHTML += `<line class="grid-line" x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#eee"/>`;
                 pos += (use24 ? 2.4 : 7.2); use24 = !use24;
             }
         }
@@ -193,8 +193,10 @@
 
         function init3D() {
             scene = new THREE.Scene(); scene.background = new THREE.Color(0xffffff);
+            // Orthographic Camera: Left, Right, Top, Bottom, Near, Far
             camera = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 1000);
-            camera.position.set(20, 20, 20); camera.lookAt(0, 0, 0);
+            camera.position.set(0, 50, 0); 
+            camera.lookAt(0, 0, 0);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(document.getElementById('canvas-3d').clientWidth, document.getElementById('canvas-3d').clientHeight);
             document.getElementById('canvas-3d').appendChild(renderer.domElement);
