@@ -10,12 +10,10 @@
         .controls { background: white; padding: 20px; border: 1px solid #ccc; overflow-y: auto; }
         .view-port { position: relative; border: 1px solid #ccc; background: #fafafa; overflow: hidden; }
         
-        /* Grid */
-        #grid-svg { pointer-events: none; }
+        #canvas-2d { background-color: #fafafa; }
         
-        /* Room Styling */
         .room-box {
-            position: absolute; border: 2px solid var(--text-main); padding: 5px; cursor: grab;
+            position: absolute; border: 2px solid var(--text-main); padding: 10px; cursor: grab;
             display: flex; flex-direction: column; resize: both; overflow: auto; min-width: 60px; min-height: 60px;
             box-shadow: 4px 4px 0px rgba(0,0,0,0.1); user-select: none; z-index: 10;
             font-weight: bold; text-transform: uppercase; font-size: 10px;
@@ -24,10 +22,8 @@
         .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; margin-top: 5px; }
         .delete-btn { cursor: pointer; color: #cc0000; float: right; }
         
-        /* Legend */
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 0.8rem; }
         .swatch { width: 15px; height: 15px; margin-right: 10px; border: 1px solid #000; }
-        .line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 6; pointer-events: none; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -37,7 +33,7 @@
 
     <div class="workspace-grid">
         <div class="controls">
-            <h3>Display</h3>
+            <h3>Configuration</h3>
             <label><input type="checkbox" id="snapToggle" checked> Snap to Grid</label><br>
             <label><input type="checkbox" id="showGrid" onchange="renderGrid()" checked> Show Custom Grid</label>
 
@@ -51,6 +47,10 @@
             </select>
             <input type="text" id="customName" placeholder="Name" style="display:none; width:95%;">
             <button onclick="addRoom()" style="background:var(--accent-orange); color:white; width:100%; border:none; padding:10px; margin-top:10px;">ADD ROOM</button>
+
+            <h3 style="margin-top:20px;">Selected Room Height</h3>
+            <input type="range" id="hSlider" min="1" max="10" step="0.5" value="3" style="width:100%" oninput="updateSelectedHeight(this.value)">
+            <p id="hVal">3m</p>
         </div>
 
         <div id="canvas-2d" class="view-port">
@@ -62,16 +62,15 @@
 
     <script>
         let rooms = [];
-        const scale = 15; // 1m = 15px
+        let selectedId = null;
+        const scale = 15;
         const colorMap = { "Living": "#FFCC00", "Kitchen": "#FFCC00", "Bathroom": "#D4E5FF", "Circulation": "#FF4500", "Custom": "#CCCCCC" };
 
-        // 1. Legend Initialization
         const legendDiv = document.getElementById('legend');
         Object.entries(colorMap).forEach(([name, color]) => {
             legendDiv.innerHTML += `<div class="legend-item"><div class="swatch" style="background:${color}"></div>${name}</div>`;
         });
 
-        // 2. Grid Logic
         function renderGrid() {
             const svg = document.getElementById('grid-svg');
             svg.innerHTML = '';
@@ -80,14 +79,17 @@
             let pos = 0, step = 1.2;
             while(pos < 1000) {
                 let px = pos * scale;
+                // Lines
                 svg.innerHTML += `<line x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#ddd" stroke-width="1"/>`;
                 svg.innerHTML += `<line x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#ddd" stroke-width="1"/>`;
+                // Labels
+                svg.innerHTML += `<text x="${px+2}" y="15" font-size="10" fill="#999">${pos.toFixed(1)}m</text>`;
+                
                 pos += step;
                 step = (step === 1.2) ? 2.4 : 1.2;
             }
         }
 
-        // 3. Room Management
         function addRoom() {
             let name = document.getElementById('rName').value;
             const id = 'room-' + Date.now();
@@ -100,6 +102,7 @@
             box.style.backgroundColor = colorMap[name] || '#CCCCCC';
             box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
             
+            box.onclick = () => selectRoom(id);
             box.onmousedown = startDrag;
             document.getElementById('canvas-2d').appendChild(box);
             
@@ -110,7 +113,24 @@
                 render3D();
             }).observe(box);
 
-            rooms.push({ id, name });
+            rooms.push({ id, name, h: 3 });
+            selectRoom(id);
+            render3D();
+        }
+
+        function selectRoom(id) {
+            selectedId = id;
+            document.querySelectorAll('.room-box').forEach(el => el.classList.remove('selected'));
+            document.getElementById(id).classList.add('selected');
+            const room = rooms.find(r => r.id === id);
+            document.getElementById('hSlider').value = room.h;
+            document.getElementById('hVal').innerText = room.h + 'm';
+        }
+
+        function updateSelectedHeight(val) {
+            if(!selectedId) return;
+            rooms.find(r => r.id === selectedId).h = parseFloat(val);
+            document.getElementById('hVal').innerText = val + 'm';
             render3D();
         }
 
@@ -120,7 +140,6 @@
             render3D();
         }
 
-        // 4. Interaction
         function startDrag(e) {
             if (e.target.classList.contains('delete-btn')) return;
             let el = e.target.closest('.room-box');
@@ -143,7 +162,6 @@
             document.addEventListener('mouseup', () => document.removeEventListener('mousemove', move));
         }
 
-        // 5. 3D Renderer
         function init3D() {
             window.scene = new THREE.Scene();
             scene.background = new THREE.Color(0xfafafa);
@@ -162,12 +180,12 @@
             scene.children.filter(c => c.type === 'Mesh').forEach(c => scene.remove(c));
             rooms.forEach(r => {
                 const el = document.getElementById(r.id);
-                const geom = new THREE.BoxGeometry(el.offsetWidth/15, 3, el.offsetHeight/15);
+                const geom = new THREE.BoxGeometry(el.offsetWidth/15, r.h, el.offsetHeight/15);
                 const mat = new THREE.MeshLambertMaterial({ color: colorMap[r.name] });
                 const cube = new THREE.Mesh(geom, mat);
                 const edges = new THREE.EdgesGeometry(geom);
                 cube.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 })));
-                cube.position.set((el.offsetLeft - 300)/15, 1.5, (el.offsetTop - 50)/15);
+                cube.position.set((el.offsetLeft - 300)/15, r.h/2, (el.offsetTop - 50)/15);
                 scene.add(cube);
             });
         }
