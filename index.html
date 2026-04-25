@@ -22,11 +22,9 @@
             font-weight: bold; text-transform: uppercase; font-size: 10px; background-color: white;
         }
         .room-box.selected { border-color: var(--accent-orange); box-shadow: 0 0 10px var(--accent-orange); }
-        .room-box.adjacent { border-color: green; }
         .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; margin-top: 5px; }
         .delete-btn { cursor: pointer; color: #cc0000; float: right; }
-        .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 0.8rem; }
-        .swatch { width: 15px; height: 15px; margin-right: 10px; border: 1px solid #000; }
+        .adj-line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 5,5; pointer-events: none; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -38,17 +36,19 @@
         <div class="workspace-grid">
             <div class="controls">
                 <h3>Configuration</h3>
-                <label><input type="checkbox" id="snapGrid" checked> Snap to Grid</label><br>
-                <label><input type="checkbox" id="snapRooms" checked> Snap to Rooms</label><br>
-                <label><input type="checkbox" id="showGrid" onchange="renderGrid()"> Show Grid</label>
+                <label><input type="checkbox" id="snapGrid"> Snap to Grid</label><br>
+                <label><input type="checkbox" id="snapRooms"> Snap to Rooms</label><br>
+                <label><input type="checkbox" id="showGrid" onchange="renderGrid()"> Show Grid</label><br>
+                <label><input type="checkbox" id="enableAdj" onchange="renderAdjacency()"> Adjacency Tool</label>
 
-                <h3 style="margin-top:20px;">Legend</h3>
-                <div id="legend"></div>
-
-                <h3 style="margin-top:20px;">Add Room</h3>
-                <input type="text" id="rName" placeholder="Name" style="width:100%; margin-bottom:5px;"><br>
-                <input type="number" id="rSqm" placeholder="SQM" style="width:100%; margin-bottom:5px;"><br>
-                <button onclick="addCustomRoom()" style="background:var(--accent-orange); color:white; width:100%; border:none; padding:10px; cursor:pointer;">ADD ROOM</button>
+                <h3 style="margin-top:20px;">Room Selection</h3>
+                <select id="presetRoom" style="width:100%; margin-bottom:10px;">
+                    <option value="Living">Living</option><option value="Dining">Dining</option>
+                    <option value="Kitchen">Kitchen</option><option value="Circulation">Circulation</option>
+                </select>
+                <input type="text" id="cName" placeholder="Custom Name" style="width:95%; margin-bottom:5px;"><br>
+                <input type="number" id="cSqm" placeholder="SQM" style="width:95%; margin-bottom:5px;"><br>
+                <button onclick="addRoom()" style="background:var(--accent-orange); color:white; width:100%; border:none; padding:10px; cursor:pointer;">ADD ROOM</button>
 
                 <h3 style="margin-top:20px;">Height</h3>
                 <input type="range" id="hSlider" min="1" max="10" step="0.5" value="3" style="width:100%" oninput="updateHeight(this.value)">
@@ -56,7 +56,7 @@
             </div>
 
             <div id="canvas-2d" class="view-port">
-                <svg id="grid-svg" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></svg>
+                <svg id="svg-layer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></svg>
             </div>
             <div id="canvas-3d" class="view-port"></div>
         </div>
@@ -68,46 +68,52 @@
 
     <script>
         let rooms = [];
+        let connections = [];
         let selectedId = null;
         let scene, camera, renderer;
-        const scale = 10; 
+        const scale = 10;
         const snapStep = 1.2 * scale;
-        const colorMap = { "Living": "#FFCC00", "Kitchen": "#FFCC00", "Bathroom": "#D4E5FF", "Circulation": "#FFCC00" };
-
-        const legendDiv = document.getElementById('legend');
-        Object.entries(colorMap).forEach(([name, color]) => {
-            legendDiv.innerHTML += `<div class="legend-item"><div class="swatch" style="background:${color}"></div>${name}</div>`;
-        });
 
         function renderGrid() {
-            const svg = document.getElementById('grid-svg');
-            svg.innerHTML = '';
+            const svg = document.getElementById('svg-layer');
+            // Retain adjacencies, clear grid
+            const gridLines = Array.from(svg.querySelectorAll('.grid-line'));
+            gridLines.forEach(l => l.remove());
+
             if(!document.getElementById('showGrid').checked) return;
             
-            let pos = 0;
-            let use24 = true;
-            for(let i=0; i<30; i++) {
-                let px = pos * scale;
-                svg.innerHTML += `<line x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#ddd" stroke-width="1"/>`;
-                svg.innerHTML += `<line x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#ddd" stroke-width="1"/>`;
-                svg.innerHTML += `<text x="${px+2}" y="15" font-size="10" fill="#999">${(pos).toFixed(1)}m</text>`;
-                pos += (use24 ? 2.4 : 7.2);
-                use24 = !use24;
+            for(let i=0; i<50; i++) {
+                let px = i * scale;
+                svg.innerHTML += `<line class="grid-line" x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#eee"/>`;
+                svg.innerHTML += `<line class="grid-line" x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#eee"/>`;
             }
         }
 
-        function addCustomRoom() {
-            const name = document.getElementById('rName').value || "Custom";
-            const sqm = parseFloat(document.getElementById('rSqm').value) || 12;
-            const side = Math.sqrt(sqm) * scale;
+        function renderAdjacency() {
+            const svg = document.getElementById('svg-layer');
+            const lines = Array.from(svg.querySelectorAll('.adj-line'));
+            lines.forEach(l => l.remove());
+            if(!document.getElementById('enableAdj').checked) return;
+
+            connections.forEach(conn => {
+                const b1 = document.getElementById(conn.r1).getBoundingClientRect();
+                const b2 = document.getElementById(conn.r2).getBoundingClientRect();
+                const cvs = document.getElementById('canvas-2d').getBoundingClientRect();
+                
+                svg.innerHTML += `<line class="adj-line" x1="${b1.left + b1.width/2 - cvs.left}" y1="${b1.top + b1.height/2 - cvs.top}" x2="${b2.left + b2.width/2 - cvs.left}" y2="${b2.top + b2.height/2 - cvs.top}"/>`;
+            });
+        }
+
+        function addRoom() {
+            const name = document.getElementById('cName').value || document.getElementById('presetRoom').value;
+            const sqm = parseFloat(document.getElementById('cSqm').value) || 12;
             const id = 'room-' + Date.now();
             
             const box = document.createElement('div');
             box.className = 'room-box'; box.id = id;
-            box.style.width = side + 'px'; 
-            box.style.height = side + 'px';
+            box.style.width = Math.sqrt(sqm) * scale + 'px'; 
+            box.style.height = Math.sqrt(sqm) * scale + 'px';
             box.style.left = '50px'; box.style.top = '50px';
-            box.style.backgroundColor = '#CCCCCC';
             box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims">${sqm}sqm</span>`;
             
             box.onclick = () => selectRoom(id);
@@ -135,23 +141,9 @@
         function deleteRoom(id) {
             document.getElementById(id).remove();
             rooms = rooms.filter(r => r.id !== id);
+            connections = connections.filter(c => c.r1 !== id && c.r2 !== id);
             render3D();
-        }
-
-        function checkAdjacency(el) {
-            el.classList.remove('adjacent');
-            const rect1 = el.getBoundingClientRect();
-            rooms.forEach(r => {
-                if(r.id === el.id) return;
-                const other = document.getElementById(r.id);
-                const rect2 = other.getBoundingClientRect();
-                
-                // If touching within 5px
-                if (!(rect1.right < rect2.left - 5 || rect1.left > rect2.right + 5 || 
-                      rect1.bottom < rect2.top - 5 || rect1.top > rect2.bottom + 5)) {
-                    el.classList.add('adjacent');
-                }
-            });
+            renderAdjacency();
         }
 
         function startDrag(e) {
@@ -165,7 +157,8 @@
                 let top = e.clientY - shiftY - document.getElementById('canvas-2d').getBoundingClientRect().top;
                 el.style.left = left + 'px';
                 el.style.top = top + 'px';
-                checkAdjacency(el);
+                checkProximity(el);
+                renderAdjacency();
             }
             
             function end() {
@@ -175,32 +168,42 @@
                     el.style.top = Math.round(parseInt(el.style.top) / snapStep) * snapStep + 'px';
                 }
                 render3D();
+                renderAdjacency();
             }
             document.addEventListener('mousemove', move);
             document.addEventListener('mouseup', end, {once: true});
+        }
+
+        function checkProximity(el) {
+            const rect1 = el.getBoundingClientRect();
+            rooms.forEach(r => {
+                if(r.id === el.id) return;
+                const other = document.getElementById(r.id);
+                const rect2 = other.getBoundingClientRect();
+                const dist = Math.hypot(rect1.left - rect2.left, rect1.top - rect2.top);
+                
+                if (dist < 100) {
+                    if(!connections.find(c => (c.r1 === el.id && c.r2 === r.id) || (c.r1 === r.id && c.r2 === el.id))) {
+                        connections.push({r1: el.id, r2: r.id});
+                    }
+                }
+            });
         }
 
         function init3D() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
             camera = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 1000);
-            camera.position.set(20, 20, 20); 
-            camera.lookAt(0, 0, 0);
-            
+            camera.position.set(20, 20, 20); camera.lookAt(0, 0, 0);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setClearColor(0xffffff);
             const container = document.getElementById('canvas-3d');
             renderer.setSize(container.clientWidth, container.clientHeight);
             container.appendChild(renderer.domElement);
-            
             scene.add(new THREE.AmbientLight(0xffffff, 0.8));
             scene.add(new THREE.DirectionalLight(0xffffff, 1.0));
+            function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
             animate();
-        }
-
-        function animate() { 
-            requestAnimationFrame(animate); 
-            renderer.render(scene, camera); 
         }
 
         function render3D() {
