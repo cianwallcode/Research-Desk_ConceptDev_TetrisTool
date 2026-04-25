@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>RESEARCH DESK</title>
-    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgMTI1Ij48cmVjdCB4PSIwIiB5PSIyNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZmY0NTAwIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZjQ1MDAiLz48cmVjdCB4PSI1MCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjxyZWN0IHg9IjEwMCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjx0ZXh0IHg9Ijc1IiB5PSI3MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjYwIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlI8L3RleHQ+PC9zdmc+">
     <style>
         :root { --bg-color: #ffffff; --accent-orange: #ff4500; --text-main: #1a1a1a; }
         body { background-color: var(--bg-color); font-family: sans-serif; margin: 0; padding: 0; color: var(--text-main); }
@@ -24,6 +23,7 @@
         .room-box.selected { border-color: var(--accent-orange); box-shadow: 0 0 10px var(--accent-orange); }
         .dims { font-size: 0.75rem; color: #333; font-family: Arial, sans-serif; font-weight: normal; text-transform: none; margin-top: 5px; }
         .delete-btn { cursor: pointer; color: #cc0000; float: right; }
+        .export-btn { position: absolute; top: 10px; right: 10px; background: #333; color: white; border: none; padding: 5px 10px; cursor: not-allowed; z-index: 100; }
         .adj-line { stroke: var(--accent-orange); stroke-width: 3; stroke-dasharray: 5,5; pointer-events: none; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -37,12 +37,10 @@
             <div class="controls">
                 <h3>Configuration</h3>
                 <label><input type="checkbox" id="snapGrid"> Snap to Grid</label><br>
-                <label><input type="checkbox" id="snapRooms"> Snap to Rooms</label><br>
-                <label><input type="checkbox" id="showGrid" onchange="renderGrid()"> Show Grid</label><br>
-                <label><input type="checkbox" id="enableAdj" onchange="renderAdjacency()"> Adjacency Tool</label>
+                <label><input type="checkbox" id="showGrid" onchange="renderGrid()"> Show Grid</label>
 
                 <h3 style="margin-top:20px;">Room Selection</h3>
-                <select id="presetRoom" style="width:100%; margin-bottom:10px;">
+                <select id="presetRoom" style="width:100%; margin-bottom:5px;">
                     <option value="Living">Living</option><option value="Dining">Dining</option>
                     <option value="Kitchen">Kitchen</option><option value="Circulation">Circulation</option>
                 </select>
@@ -50,12 +48,18 @@
                 <input type="number" id="cSqm" placeholder="SQM" style="width:95%; margin-bottom:5px;"><br>
                 <button onclick="addRoom()" style="background:var(--accent-orange); color:white; width:100%; border:none; padding:10px; cursor:pointer;">ADD ROOM</button>
 
-                <h3 style="margin-top:20px;">Height</h3>
-                <input type="range" id="hSlider" min="1" max="10" step="0.5" value="3" style="width:100%" oninput="updateHeight(this.value)">
-                <p id="hVal">3m</p>
+                <h3 style="margin-top:20px;">Room Properties</h3>
+                <label>Color: </label><input type="color" id="roomColor" onchange="updateRoomColor(this.value)"><br>
+                <label>Height (m): </label><input type="range" id="hSlider" min="1" max="10" step="0.5" value="3" style="width:100%" oninput="updateHeight(this.value)">
+
+                <h3 style="margin-top:20px;">Adjacency Link</h3>
+                <select id="link1" style="width:100%; margin-bottom:5px;"></select>
+                <select id="link2" style="width:100%; margin-bottom:5px;"></select>
+                <button onclick="addLink()" style="background:#555; color:white; width:100%; border:none; padding:5px;">LINK ROOMS</button>
             </div>
 
             <div id="canvas-2d" class="view-port">
+                <button class="export-btn">EXPORT DXF</button>
                 <svg id="svg-layer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></svg>
             </div>
             <div id="canvas-3d" class="view-port"></div>
@@ -76,52 +80,71 @@
 
         function renderGrid() {
             const svg = document.getElementById('svg-layer');
-            // Retain adjacencies, clear grid
-            const gridLines = Array.from(svg.querySelectorAll('.grid-line'));
-            gridLines.forEach(l => l.remove());
-
+            svg.querySelectorAll('.grid-line').forEach(l => l.remove());
             if(!document.getElementById('showGrid').checked) return;
             
-            for(let i=0; i<50; i++) {
-                let px = i * scale;
+            let pos = 0; let use24 = true;
+            for(let i=0; i<30; i++) {
+                let px = pos * scale;
                 svg.innerHTML += `<line class="grid-line" x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#eee"/>`;
-                svg.innerHTML += `<line class="grid-line" x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#eee"/>`;
+                svg.innerHTML += `<line class="grid-line" x1="0" y1="${px}" x2="100%" y1="${px}" stroke="#eee"/>`;
+                pos += (use24 ? 2.4 : 7.2); use24 = !use24;
             }
-        }
-
-        function renderAdjacency() {
-            const svg = document.getElementById('svg-layer');
-            const lines = Array.from(svg.querySelectorAll('.adj-line'));
-            lines.forEach(l => l.remove());
-            if(!document.getElementById('enableAdj').checked) return;
-
-            connections.forEach(conn => {
-                const b1 = document.getElementById(conn.r1).getBoundingClientRect();
-                const b2 = document.getElementById(conn.r2).getBoundingClientRect();
-                const cvs = document.getElementById('canvas-2d').getBoundingClientRect();
-                
-                svg.innerHTML += `<line class="adj-line" x1="${b1.left + b1.width/2 - cvs.left}" y1="${b1.top + b1.height/2 - cvs.top}" x2="${b2.left + b2.width/2 - cvs.left}" y2="${b2.top + b2.height/2 - cvs.top}"/>`;
-            });
         }
 
         function addRoom() {
             const name = document.getElementById('cName').value || document.getElementById('presetRoom').value;
             const sqm = parseFloat(document.getElementById('cSqm').value) || 12;
             const id = 'room-' + Date.now();
+            const side = Math.sqrt(sqm) * scale;
             
             const box = document.createElement('div');
             box.className = 'room-box'; box.id = id;
-            box.style.width = Math.sqrt(sqm) * scale + 'px'; 
-            box.style.height = Math.sqrt(sqm) * scale + 'px';
+            box.style.width = side + 'px'; box.style.height = side + 'px';
             box.style.left = '50px'; box.style.top = '50px';
-            box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims">${sqm}sqm</span>`;
+            box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims">${(side/scale).toFixed(1)}m x ${(side/scale).toFixed(1)}m</span>`;
             
             box.onclick = () => selectRoom(id);
             box.onmousedown = startDrag;
             document.getElementById('canvas-2d').appendChild(box);
             
-            rooms.push({ id, name, h: 3 });
+            rooms.push({ id, name, h: 3, color: '#ffffff' });
+            updateLinkDropdowns();
             selectRoom(id);
+            render3D();
+        }
+
+        function updateLinkDropdowns() {
+            const l1 = document.getElementById('link1'); const l2 = document.getElementById('link2');
+            l1.innerHTML = ''; l2.innerHTML = '';
+            rooms.forEach(r => {
+                l1.innerHTML += `<option value="${r.id}">${r.name}</option>`;
+                l2.innerHTML += `<option value="${r.id}">${r.name}</option>`;
+            });
+        }
+
+        function addLink() {
+            const r1 = document.getElementById('link1').value;
+            const r2 = document.getElementById('link2').value;
+            if(r1 && r2 && r1 !== r2) connections.push({r1, r2});
+            renderAdjacency();
+        }
+
+        function renderAdjacency() {
+            const svg = document.getElementById('svg-layer');
+            svg.querySelectorAll('.adj-line').forEach(l => l.remove());
+            connections.forEach(conn => {
+                const b1 = document.getElementById(conn.r1).getBoundingClientRect();
+                const b2 = document.getElementById(conn.r2).getBoundingClientRect();
+                const cvs = document.getElementById('canvas-2d').getBoundingClientRect();
+                svg.innerHTML += `<line class="adj-line" x1="${b1.left + b1.width/2 - cvs.left}" y1="${b1.top + b1.height/2 - cvs.top}" x2="${b2.left + b2.width/2 - cvs.left}" y2="${b2.top + b2.height/2 - cvs.top}"/>`;
+            });
+        }
+
+        function updateRoomColor(col) {
+            if(!selectedId) return;
+            document.getElementById(selectedId).style.backgroundColor = col;
+            rooms.find(r => r.id === selectedId).color = col;
             render3D();
         }
 
@@ -134,7 +157,6 @@
         function updateHeight(val) {
             if(!selectedId) return;
             rooms.find(r => r.id === selectedId).h = parseFloat(val);
-            document.getElementById('hVal').innerText = val + 'm';
             render3D();
         }
 
@@ -142,8 +164,8 @@
             document.getElementById(id).remove();
             rooms = rooms.filter(r => r.id !== id);
             connections = connections.filter(c => c.r1 !== id && c.r2 !== id);
-            render3D();
-            renderAdjacency();
+            updateLinkDropdowns();
+            render3D(); renderAdjacency();
         }
 
         function startDrag(e) {
@@ -153,53 +175,29 @@
             let shiftY = e.clientY - el.getBoundingClientRect().top;
             
             function move(e) {
-                let left = e.clientX - shiftX - document.getElementById('canvas-2d').getBoundingClientRect().left;
-                let top = e.clientY - shiftY - document.getElementById('canvas-2d').getBoundingClientRect().top;
-                el.style.left = left + 'px';
-                el.style.top = top + 'px';
-                checkProximity(el);
+                el.style.left = (e.clientX - shiftX - document.getElementById('canvas-2d').getBoundingClientRect().left) + 'px';
+                el.style.top = (e.clientY - shiftY - document.getElementById('canvas-2d').getBoundingClientRect().top) + 'px';
                 renderAdjacency();
             }
-            
             function end() {
                 document.removeEventListener('mousemove', move);
                 if(document.getElementById('snapGrid').checked) {
                     el.style.left = Math.round(parseInt(el.style.left) / snapStep) * snapStep + 'px';
                     el.style.top = Math.round(parseInt(el.style.top) / snapStep) * snapStep + 'px';
                 }
-                render3D();
-                renderAdjacency();
+                render3D(); renderAdjacency();
             }
             document.addEventListener('mousemove', move);
             document.addEventListener('mouseup', end, {once: true});
         }
 
-        function checkProximity(el) {
-            const rect1 = el.getBoundingClientRect();
-            rooms.forEach(r => {
-                if(r.id === el.id) return;
-                const other = document.getElementById(r.id);
-                const rect2 = other.getBoundingClientRect();
-                const dist = Math.hypot(rect1.left - rect2.left, rect1.top - rect2.top);
-                
-                if (dist < 100) {
-                    if(!connections.find(c => (c.r1 === el.id && c.r2 === r.id) || (c.r1 === r.id && c.r2 === el.id))) {
-                        connections.push({r1: el.id, r2: r.id});
-                    }
-                }
-            });
-        }
-
         function init3D() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xffffff);
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0xffffff);
             camera = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 1000);
             camera.position.set(20, 20, 20); camera.lookAt(0, 0, 0);
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setClearColor(0xffffff);
-            const container = document.getElementById('canvas-3d');
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            container.appendChild(renderer.domElement);
+            renderer.setSize(document.getElementById('canvas-3d').clientWidth, document.getElementById('canvas-3d').clientHeight);
+            document.getElementById('canvas-3d').appendChild(renderer.domElement);
             scene.add(new THREE.AmbientLight(0xffffff, 0.8));
             scene.add(new THREE.DirectionalLight(0xffffff, 1.0));
             function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
@@ -211,7 +209,7 @@
             rooms.forEach(r => {
                 const el = document.getElementById(r.id);
                 const geom = new THREE.BoxGeometry(el.offsetWidth/scale, r.h, el.offsetHeight/scale);
-                const mat = new THREE.MeshLambertMaterial({ color: 0xff4500 });
+                const mat = new THREE.MeshLambertMaterial({ color: r.color });
                 const cube = new THREE.Mesh(geom, mat);
                 const edges = new THREE.EdgesGeometry(geom);
                 cube.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 })));
