@@ -6,7 +6,7 @@
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgMTI1Ij48cmVjdCB4PSIwIiB5PSIyNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZmY0NTAwIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZjQ1MDAiLz48cmVjdCB4PSI1MCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjxyZWN0IHg9IjEwMCIgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iI2ZmNDUwMCIvPjx0ZXh0IHg9Ijc1IiB5PSI3MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjYwIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlI8L3RleHQ+PC9zdmc+">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        :root { --bg-color: #f0f0f0; --accent-orange: #ff4500; --text-main: #1a1a1a; --grid-color: #d1d1d1; }
+        :root { --bg-color: #f0f0f0; --accent-orange: #ff4500; --text-main: #1a1a1a; }
         body { background-color: var(--bg-color); font-family: sans-serif; margin: 0; padding: 2rem; }
         header { border-bottom: 1px solid var(--text-main); margin-bottom: 2rem; }
         footer { margin-top: 40px; border-top: 1px solid var(--text-main); padding-top: 20px; font-family: Arial, sans-serif; font-size: 0.8rem; }
@@ -15,11 +15,9 @@
         .controls { background: white; padding: 20px; border: 1px solid #ccc; overflow-y: auto; }
         
         .view-port { position: relative; border: 1px solid #ccc; background: #fafafa; overflow: hidden; }
-        #canvas-2d { 
-            background-image: linear-gradient(to right, #e0e0e0 1px, transparent 1px), linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
-
+        
+        #canvas-2d { background-color: #fafafa; }
+        
         .room-box {
             position: absolute; border: 2px solid var(--text-main); padding: 10px; cursor: grab;
             display: flex; flex-direction: column; resize: both; overflow: auto; min-width: 60px; min-height: 60px;
@@ -41,7 +39,11 @@
 
     <div class="workspace-grid">
         <div class="controls">
-            <h3>Legend</h3>
+            <h3>Display Toggles</h3>
+            <label><input type="checkbox" id="toggleStruct" onchange="updateGrids()" checked> Structural (1.5m steps)</label><br>
+            <label><input type="checkbox" id="toggleTartan" onchange="updateGrids()"> Tartan (1.2m steps)</label>
+
+            <h3 style="margin-top:20px;">Legend</h3>
             <div id="legend"></div>
 
             <h3 style="margin-top:20px;">Program</h3>
@@ -65,9 +67,13 @@
             <select id="roomA" style="width:100%"></select> near
             <select id="roomB" style="width:100%"></select>
             <button onclick="addAdjacency()" style="margin-top:10px; width:100%;">Connect</button>
+
+            <h3 style="margin-top:20px;">Utilities</h3>
+            <button onclick="exportToDXF()" style="background:var(--text-main); color:white; width:100%; border:none; padding:10px;">EXPORT TO DXF</button>
         </div>
 
         <div id="canvas-2d" class="view-port">
+            <svg id="grid-svg" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></svg>
             <svg id="svgLayer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></svg>
         </div>
         <div id="canvas-3d" class="view-port"></div>
@@ -82,13 +88,43 @@
         let adjacencies = [];
         let selectedId = null;
         let scene, camera, renderer;
-        const scale = 15;
+        const scale = 15; // 1m = 15px
         const GRID_SIZE = 20;
         const colorMap = { "Living": 0xFFCC00, "Kitchen": 0xFFCC00, "Bathroom": 0xD4E5FF, "Circulation": 0xFF4500, "Exterior": 0x77DD77, "Custom": 0xCCCCCC };
 
-        function toggleCustom() {
-            document.getElementById('customName').style.display = (document.getElementById('rName').value === 'Custom') ? 'block' : 'none';
+        // Grid Drawing
+        function updateGrids() {
+            const svg = document.getElementById('grid-svg');
+            svg.innerHTML = '';
+            
+            // Structural Grid (1.5m base)
+            if(document.getElementById('toggleStruct').checked) {
+                const steps = [1.5, 3.0, 4.5, 6.0];
+                steps.forEach((m, i) => {
+                    const px = m * scale;
+                    // Vertical
+                    svg.innerHTML += `<line x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#ccc" stroke-dasharray="4"/>`;
+                    svg.innerHTML += `<text x="${px+2}" y="15" font-size="10" fill="#999">${m}m</text>`;
+                    // Horizontal
+                    svg.innerHTML += `<line x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#ccc" stroke-dasharray="4"/>`;
+                });
+            }
+            
+            // Tartan Grid (1.2m base)
+            if(document.getElementById('toggleTartan').checked) {
+                const steps = [1.2, 2.4, 3.6, 4.8];
+                steps.forEach((m, i) => {
+                    const px = m * scale;
+                    // Vertical
+                    svg.innerHTML += `<line x1="${px}" y1="0" x2="${px}" y2="100%" stroke="#ff9999" stroke-width="2"/>`;
+                    svg.innerHTML += `<text x="${px+2}" y="30" font-size="10" fill="#ff9999">${m}m</text>`;
+                    // Horizontal
+                    svg.innerHTML += `<line x1="0" y1="${px}" x2="100%" y2="${px}" stroke="#ff9999" stroke-width="2"/>`;
+                });
+            }
         }
+
+        function toggleCustom() { document.getElementById('customName').style.display = (document.getElementById('rName').value === 'Custom') ? 'block' : 'none'; }
 
         const legendDiv = document.getElementById('legend');
         Object.entries(colorMap).forEach(([name, color]) => {
@@ -118,9 +154,28 @@
                 const geom = new THREE.BoxGeometry(el.offsetWidth/15, r.h, el.offsetHeight/15);
                 const mat = new THREE.MeshLambertMaterial({ color: colorMap[r.name] || 0xcccccc });
                 const cube = new THREE.Mesh(geom, mat);
+                const edges = new THREE.EdgesGeometry(geom);
+                const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+                cube.add(line);
                 cube.position.set((el.offsetLeft - 300)/15, r.h/2, (el.offsetTop - 50)/15);
                 scene.add(cube);
             });
+        }
+
+        function exportToDXF() {
+            let dxf = `0\nSECTION\n2\nENTITIES\n`;
+            rooms.forEach(r => {
+                const el = document.getElementById(r.id);
+                const x1 = el.offsetLeft, y1 = el.offsetTop;
+                const x2 = x1 + el.offsetWidth, y2 = y1 + el.offsetHeight;
+                dxf += `0\nLWPOLYLINE\n8\nROOMS\n90\n4\n70\n1\n10\n${x1}\n20\n${y1}\n10\n${x2}\n20\n${y1}\n10\n${x2}\n20\n${y2}\n10\n${x1}\n20\n${y2}\n`;
+            });
+            dxf += `0\nENDSEC\n0\nEOF`;
+            const blob = new Blob([dxf], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'layout.dxf';
+            a.click();
         }
 
         function addRoom() {
@@ -128,18 +183,14 @@
             if(name === 'Custom') name = document.getElementById('customName').value || 'New Room';
             const size = Math.sqrt(parseFloat(document.getElementById('rSqm').value)) * scale;
             const id = 'room-' + Date.now();
-            
-            // Circulation: 1.2m wide, 5m long. Others: based on input size.
             let w = (name === 'Circulation') ? 1.2 * scale : size;
             let h = (name === 'Circulation') ? 5 * scale : size;
-            
             const offset = rooms.length * 25;
             
             const box = document.createElement('div');
             box.className = 'room-box'; box.id = id;
             box.style.width = w + 'px'; box.style.height = h + 'px';
-            box.style.left = (50 + offset) + 'px'; 
-            box.style.top = (50 + offset) + 'px';
+            box.style.left = (50 + offset) + 'px'; box.style.top = (50 + offset) + 'px';
             box.style.backgroundColor = '#' + (colorMap[name] || 0xCCCCCC).toString(16).padStart(6, '0');
             box.innerHTML = `<div>${name} <span class="delete-btn" onclick="deleteRoom('${id}')">X</span></div><span class="dims"></span>`;
             
@@ -150,7 +201,7 @@
                 const b = document.getElementById(id);
                 const w = (b.offsetWidth/scale).toFixed(1);
                 const h = (b.offsetHeight/scale).toFixed(1);
-                b.querySelector('.dims').innerText = `${w}m x ${h}m | ${(w*h).toFixed(1)}sqm`;
+                b.querySelector('.dims').innerText = `${w}m x ${h}m`;
                 renderLines(); render3D();
             }).observe(box);
 
@@ -227,10 +278,8 @@
             function move(e) {
                 let left = e.clientX - shiftX - document.getElementById('canvas-2d').getBoundingClientRect().left;
                 let top = e.clientY - shiftY - document.getElementById('canvas-2d').getBoundingClientRect().top;
-
                 left = Math.round(left / GRID_SIZE) * GRID_SIZE;
                 top = Math.round(top / GRID_SIZE) * GRID_SIZE;
-
                 el.style.left = left + 'px';
                 el.style.top = top + 'px';
                 renderLines(); render3D();
@@ -240,6 +289,7 @@
         }
 
         init3D();
+        updateGrids();
     </script>
 </body>
 </html>
